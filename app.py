@@ -558,8 +558,27 @@ def download_article():
         if not safe_title:
             safe_title = "makale"
 
+        filename = f"{safe_title}.md"
+
+        import unicodedata
+        import urllib.parse
+
         response = Response(final_content.encode('utf-8'), mimetype='text/markdown')
-        response.headers.set('Content-Disposition', 'attachment', filename=f"{safe_title}.md")
+
+        try:
+            filename.encode('ascii')
+            response.headers.set('Content-Disposition', 'attachment', filename=filename)
+        except UnicodeEncodeError:
+            # Create an ASCII fallback filename
+            fallback_filename = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
+            # Replace spaces/special patterns or fallback if it's empty
+            fallback_filename = "".join([c for c in fallback_filename if c.isalnum() or c in (' ', '_', '-', '.')]).strip()
+            if not fallback_filename or fallback_filename == ".md":
+                fallback_filename = "makale.md"
+
+            quoted_filename = urllib.parse.quote(filename)
+            response.headers.set('Content-Disposition', 'attachment', filename=fallback_filename, **{'filename*': f"UTF-8''{quoted_filename}"})
+
         return response
 
     except Exception as e:

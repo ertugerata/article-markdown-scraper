@@ -132,5 +132,39 @@ class TestApp(unittest.TestCase):
         self.assertNotIn('Menu linkleri', content_decoded)
         self.assertNotIn('Alt Bilgi', content_decoded)
 
+    @patch('app.requests.get')
+    def test_download_article_unicode_filename(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.text = """
+            <html>
+                <head>
+                    <title>Şekerci Ali'nin Maceraları</title>
+                    <meta property="article:published_time" content="2023-12-02">
+                </head>
+                <body>
+                    <article>
+                        <h1>Şekerci Ali'nin Maceraları</h1>
+                        <p>Türkçe karakterli başlık testi.</p>
+                    </article>
+                </body>
+            </html>
+        """
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        response = self.app.get('/download?url=https://ornek.com/yazi2')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, 'text/markdown')
+
+        cd_header = response.headers.get('Content-Disposition')
+        self.assertIn('attachment', cd_header)
+        # Should contain the ascii fallback filename
+        self.assertIn('filename=Sekerci_Alinin_Maceralar.md', cd_header)
+        # Should contain the UTF-8 encoded filename* parameter
+        self.assertIn("filename*=UTF-8''%C5%9Eekerci_Alinin_Maceralar%C4%B1.md", cd_header)
+
+        content_decoded = response.data.decode('utf-8')
+        self.assertIn('# Şekerci Ali\'nin Maceraları', content_decoded)
+
 if __name__ == '__main__':
     unittest.main()
